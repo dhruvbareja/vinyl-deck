@@ -1,15 +1,16 @@
 import SwiftUI
 
 @main
-struct vinyl_appApp: App {
+struct VinylApp: App {
+    @Environment(\.scenePhase) private var scenePhase
+
     var body: some Scene {
         WindowGroup {
             ContentView()
+                // 👇 attach onOpenURL to ContentView (root view)
                 .onOpenURL { url in
-                    // App Remote (you already use this for playback)
+                    print("🔗 onOpenURL →", url.absoluteString)
                     SpotifyManager.shared.handleURL(url)
-                    // Web API (playlists/auth via PKCE)
-                    SpotifyWebAuth.shared.handleRedirectURL(url)
                 }
         }
     }

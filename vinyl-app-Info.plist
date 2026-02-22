@@ -2,28 +2,28 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key> LSApplicationQueriesSchemes</key>
-	<array>
-		<string>spotify-api</string>
-		<string>spotify-actions</string>
-		<string>spotify</string>
-	</array>
-	<key>CFBundleURLTypes</key>
-	<array>
-		<dict>
-			<key>CFBundleTypeRole</key>
-			<string>Editor</string>
-			<key>CFBundleURLName</key>
-			<string>vinylplayer</string>
-			<key>CFBundleURLSchemes</key>
-			<array>
-				<string>vinylplayer</string>
-			</array>
-		</dict>
-	</array>
-	<key>LSApplicationQueriesSchemes</key>
-	<array>
-		<string></string>
-	</array>
+    <!-- Allow checking and opening Spotify -->
+    <key>LSApplicationQueriesSchemes</key>
+    <array>
+        <string>spotify</string>
+        <string>spotify-ios</string>
+        <string>spotify-sdk</string>
+        <string>spotify-action</string>
+    </array>
+
+    <!-- Your app’s custom URL scheme for the redirect -->
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleTypeRole</key>
+            <string>None</string>
+            <key>CFBundleURLName</key>
+            <string>vinylplayer</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>vinylplayer</string>
+            </array>
+        </dict>
+    </array>
 </dict>
 </plist>
