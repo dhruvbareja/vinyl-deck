@@ -1,4 +1,6 @@
 import SwiftUI
+import Combine
+import UIKit
 
 struct ContentView: View {
     @StateObject private var spotify = SpotifyManager.shared
@@ -11,6 +13,7 @@ struct ContentView: View {
     @State private var playing = false
     @Namespace private var ns
     @State private var selectedImage: UIImage?
+    @State private var selectedAlbum: SPAlbum?
     
     
     // LoginLandingView.swift (new file or add to ContentView.swift)
@@ -97,7 +100,10 @@ struct ContentView: View {
 
                 case .coverflow:
                     CoverflowScreen(ns: ns) { album, ui in
-                        SpotifyManager.shared.playAlbum(album.id)
+                        selectedAlbum = album
+                        if SpotifyWebAuth.shared.webAPIToken != nil {
+                            SpotifyManager.shared.playAlbum(album.id)
+                        }
                         selectedImage = ui
                         withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
                             screen = .player
@@ -107,6 +113,7 @@ struct ContentView: View {
 
                 case .player:
                     PlayerScreen(
+                        selectedAlbum: selectedAlbum,
                         selectedImage: selectedImage,
                         playing: $playing,
                         onClose: {
@@ -133,58 +140,179 @@ private struct CoverflowScreen: View {
     var onSelect: (SPAlbum, UIImage?) -> Void
 
     var body: some View {
-        VStack(spacing: 16) {
-            HStack {
-                Spacer()
-                Text("Pick an album")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-            }
-            .padding(.horizontal)
-
-            HStack(spacing: 12) {
-                Button("Authorize Spotify") {
-                    SpotifyManager.shared.authorize()
-                }
-                .buttonStyle(.bordered)
-
-                Button("Connect") {
-                    SpotifyManager.shared.connect()
-                }
-                .buttonStyle(.borderedProminent)
-
-                Button("Disconnect") {
-                    SpotifyManager.shared.disconnect()
-                }
-                .buttonStyle(.bordered)
-            }
-            .padding(.top, 4)
-
-            if SpotifyWebAuth.shared.webAPIToken == nil {
-                Button("Login for Albums (Web API)") {
-                    SpotifyWebAuth.shared.login()
-                }
-                .buttonStyle(.borderedProminent)
-            }
-
-            GeometryReader { geo in
-                AlbumCoverFlowView(ns: ns, onSelect: onSelect)
-                    .frame(height: max(360, geo.size.height * 0.75))
-                    .frame(maxWidth: .infinity,
-                           maxHeight: .infinity,
-                           alignment: .center)
-            }
-        }
-        .padding()
-        .background(
-            LinearGradient(colors: [.black, .gray.opacity(0.7)],
-                           startPoint: .top,
-                           endPoint: .bottom)
-            .ignoresSafeArea()
-        )
+        AlbumCoverFlowView(ns: ns, onSelect: onSelect)
     }
 }
+
+// MARK: - Player Screen ROUTER
 private struct PlayerScreen: View {
+    let selectedAlbum: SPAlbum?
+    let selectedImage: UIImage?
+    @Binding var playing: Bool
+    var onClose: () -> Void
+
+    var body: some View {
+        if UIDevice.current.userInterfaceIdiom == .pad {
+            PadPlayerScreen(selectedAlbum: selectedAlbum, selectedImage: selectedImage, playing: $playing, onClose: onClose)
+        } else {
+            PhonePlayerScreen(selectedAlbum: selectedAlbum, selectedImage: selectedImage, playing: $playing, onClose: onClose)
+        }
+    }
+}
+
+// MARK: - iPHONE Dedicated Player (Vertical Unboxing Animation)
+private struct PhonePlayerScreen: View {
+    let selectedAlbum: SPAlbum?
+    let selectedImage: UIImage?
+    @Binding var playing: Bool
+    var onClose: () -> Void
+
+    @StateObject private var spotify = SpotifyManager.shared
+    @State private var dockedIntoSleeve: Bool = true // Starts docked so animation triggers!
+
+    var body: some View {
+        ZStack {
+            // Background: blurred album art
+            if let bg = spotify.albumArt ?? selectedImage {
+                Image(uiImage: bg)
+                    .resizable()
+                    .scaledToFill()
+                    .blur(radius: 50)
+                    .saturation(0.9)
+                    .ignoresSafeArea()
+                    .overlay(Color.black.opacity(0.40))
+            } else {
+                Color(red: 0.1, green: 0.1, blue: 0.12).ignoresSafeArea()
+            }
+
+            VStack(spacing: 0) {
+                GeometryReader { geo in
+                    let W = geo.size.width
+                    let coverWidth = W * 0.65
+                    let discWidth = W * 0.70
+                    
+                    // Zooms out slightly when unboxing so nothing hits the edges
+                    let assemblyScale = dockedIntoSleeve ? 1.0 : 0.85
+
+                    ZStack(alignment: .center) {
+                        // THE DISC (Slides DOWN on Phone)
+                        MDVinylDeckView(
+                            cover: (spotify.albumArt ?? selectedImage).map { Image(uiImage: $0) },
+                            playing: $playing,
+                            showCoverCard: false,
+                            recordSlide: 0 // Physics handled by Y offset below
+                        )
+                        .frame(width: discWidth, height: discWidth)
+                        .scaleEffect(dockedIntoSleeve ? 0.98 : 1.0)
+                        .shadow(color: .black.opacity(dockedIntoSleeve ? 0.15 : 0.40), radius: dockedIntoSleeve ? 10 : 25, x: 0, y: dockedIntoSleeve ? 6 : 15)
+                        .offset(y: dockedIntoSleeve ? 0 : discWidth * 0.65) // SLIDES DOWN
+                        .zIndex(1)
+
+                        // THE SLEEVE (Slides UP on Phone)
+                        CoverCard(image: spotify.albumArt ?? selectedImage)
+                            .frame(width: coverWidth)
+                            .zIndex(2)
+                            .offset(y: dockedIntoSleeve ? 0 : -discWidth * 0.45) // SLIDES UP
+                            .onTapGesture {
+                                withAnimation(.interpolatingSpring(stiffness: 150, damping: 12)) {
+                                    dockedIntoSleeve.toggle()
+                                }
+                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                            }
+                    }
+                    .scaleEffect(assemblyScale)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                }
+                .frame(height: UIScreen.main.bounds.height * 0.55)
+                .zIndex(2)
+
+                Spacer()
+
+                // Titles & Controls
+                VStack(spacing: 8) {
+                    Text(playerTitle)
+                        .font(.system(size: 18, weight: .bold))
+                        .lineLimit(1)
+                        .foregroundStyle(.white)
+                    
+                    Text(playerArtist)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.7))
+                        .lineLimit(1)
+                    
+                    HStack(spacing: 24) {
+                        Button(action: { spotify.previous() }) {
+                            Image(systemName: "backward.fill")
+                                .font(.system(size: 16, weight: .semibold))
+                                .frame(width: 48, height: 48)
+                                .background(Color.white.opacity(0.1))
+                                .clipShape(Circle())
+                        }
+                        
+                        Button(action: { playing ? spotify.pause() : spotify.resume() }) {
+                            Image(systemName: playing ? "pause.fill" : "play.fill")
+                                .font(.system(size: 20, weight: .bold))
+                                .frame(width: 64, height: 64)
+                                .background(LinearGradient(colors: [Color.white.opacity(0.2), Color.white.opacity(0.1)], startPoint: .topLeading, endPoint: .bottomTrailing))
+                                .clipShape(Circle())
+                                .overlay(Circle().stroke(Color.white.opacity(0.3), lineWidth: 1))
+                        }
+                        
+                        Button(action: { spotify.next() }) {
+                            Image(systemName: "forward.fill")
+                                .font(.system(size: 16, weight: .semibold))
+                                .frame(width: 48, height: 48)
+                                .background(Color.white.opacity(0.1))
+                                .clipShape(Circle())
+                        }
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.top, 16)
+                }
+                .padding(.horizontal, 24)
+                .zIndex(3)
+
+                Spacer()
+
+                Button(action: { onClose() }) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "chevron.down").font(.system(size: 13, weight: .semibold))
+                        Text("Close").font(.system(size: 14, weight: .semibold))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 50)
+                    .background(Color.white.opacity(0.08))
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.white.opacity(0.12), lineWidth: 1))
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 32)
+            }
+        }
+        .onAppear {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                withAnimation(.interpolatingSpring(stiffness: 120, damping: 14)) { dockedIntoSleeve = false }
+            }
+        }
+    }
+
+    private var playerTitle: String {
+        if spotify.trackName.isEmpty == false { return spotify.trackName }
+        return selectedAlbum?.name ?? "Not Playing"
+    }
+
+    private var playerArtist: String {
+        if spotify.artistName.isEmpty == false { return spotify.artistName }
+        let fallback = selectedAlbum?.artists?.map(\.name).joined(separator: ", ")
+        return fallback ?? ""
+    }
+}
+
+
+// MARK: - iPAD Dedicated Player (Your Unaltered Original Logic)
+private struct PadPlayerScreen: View {
+    let selectedAlbum: SPAlbum?
     let selectedImage: UIImage?
     @Binding var playing: Bool
     var onClose: () -> Void
@@ -302,12 +430,12 @@ private struct PlayerScreen: View {
 
                 // Title + controls
                 VStack(spacing: 4) {
-                                    Text(spotify.trackName.isEmpty ? "Not Playing" : spotify.trackName)
+                                    Text(playerTitle)
                                         .font(.system(size: 18, weight: .semibold))
                                         .lineLimit(1)
                                         .foregroundStyle(.white)
                                     
-                                    Text(spotify.artistName)
+                                    Text(playerArtist)
                                         .font(.system(size: 14, weight: .regular))
                                         .foregroundStyle(.white.opacity(0.7))
                                         .lineLimit(1)
@@ -375,6 +503,17 @@ private struct PlayerScreen: View {
             .padding(.horizontal, 24)
             .padding(.vertical, 12)
         }
+    }
+
+    private var playerTitle: String {
+        if spotify.trackName.isEmpty == false { return spotify.trackName }
+        return selectedAlbum?.name ?? "Not Playing"
+    }
+
+    private var playerArtist: String {
+        if spotify.artistName.isEmpty == false { return spotify.artistName }
+        let fallback = selectedAlbum?.artists?.map(\.name).joined(separator: ", ")
+        return fallback ?? ""
     }
 }
 

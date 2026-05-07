@@ -13,8 +13,8 @@ final class SpotifyWebAuth: NSObject, ObservableObject, SPTSessionManagerDelegat
 
     @Published private(set) var webAPIToken: String?
 
-    private let clientID = "3dcb9fbd5f01403f8e64faa975c312e4"
-    private let redirectURI = URL(string: "vinylplayer://callback")!
+    private let clientID = AppConfig.spotifyClientID
+    private let redirectURI = AppConfig.spotifyRedirectURI
 
     private lazy var configuration: SPTConfiguration = {
         let c = SPTConfiguration(clientID: clientID, redirectURL: redirectURI)

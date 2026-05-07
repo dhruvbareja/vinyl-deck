@@ -2,6 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+    <key>GEMINI_API_KEY</key>
+    <string></string>
+    <key>SPOTIFY_CLIENT_ID</key>
+    <string>3dcb9fbd5f01403f8e64faa975c312e4</string>
+    <key>SPOTIFY_REDIRECT_URI</key>
+    <string>vinylplayer://callback</string>
     <!-- Allow checking and opening Spotify -->
     <key>LSApplicationQueriesSchemes</key>
     <array>

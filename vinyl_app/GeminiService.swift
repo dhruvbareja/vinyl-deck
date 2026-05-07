@@ -19,7 +19,7 @@ final class GeminiService {
     // ⚠️ DO NOT hardcode in production
     // Replace this with env / xcconfig later
     private let apiKey: String = {
-        guard let key = Bundle.main.object(forInfoDictionaryKey: "GEMINI_API_KEY") as? String else {
+        guard let key = AppConfig.geminiAPIKey else {
             fatalError("❌ GEMINI_API_KEY not found in Info.plist")
         }
         return key

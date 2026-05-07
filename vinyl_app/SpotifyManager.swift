@@ -6,8 +6,8 @@ import Combine
 final class SpotifyManager: NSObject, ObservableObject {
     static let shared = SpotifyManager()
 
-    private let clientID = "3dcb9fbd5f01403f8e64faa975c312e4"
-    private let redirectURI = URL(string: "vinylplayer://callback")!
+    private let clientID = AppConfig.spotifyClientID
+    private let redirectURI = AppConfig.spotifyRedirectURI
 
     @Published var isConnected = false
     @Published var isPlaying   = false
